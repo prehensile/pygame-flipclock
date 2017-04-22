@@ -64,26 +64,43 @@ class ClockDisplay():
     SEGMENT_UPPER = 1
     SEGMENT_LOWER = 2
     def display_number( self, number, pos, segment=SEGMENT_BOTH ):
+        
         img = self.number_surfaces[ number ]
         area = img.get_clip()
         offs = [0,0]
+        
         if segment == self.SEGMENT_UPPER:
             area.height /=2
+        
         elif segment == self.SEGMENT_LOWER:
             hh = area.height /2
             area.top = hh
             area.height = hh
             offs[1] = hh
-        self.window.blit( img, (pos[0]+offs[0],pos[1]+offs[1]), area=area )
+        
+        p = (pos[0]+offs[0],pos[1]+offs[1])
+        self.window.blit( img, p, area=area )
+
+        # draw a translucent black rect over *most* of a changing segement
+        # cheap, hacky transition effect!
+        if segment == self.SEGMENT_UPPER:
+            yo = 10
+            r = pygame.Rect( (p[0],p[1]+yo), (area.width,area.height-yo) )
+            brightness = 128 + 64
+            self.window.fill( (brightness,brightness,brightness), rect=r, special_flags=pygame.BLEND_MULT )
 
 
     PADDING = 8
     SPACING = 116
-    def display_numbers( self, numbers, segment=SEGMENT_BOTH ):
+    def display_numbers( self, numbers, segment=SEGMENT_BOTH, mask=None ):
         pos = [self.PADDING,self.PADDING]
+        i = 0
         for n in numbers:
-            self.display_number( n, pos, segment=segment )
+            if n is not None:
+                if (mask is None) or (mask and mask[i]):
+                    self.display_number( n, pos, segment=segment )    
             pos[0] += self.SPACING
+            i += 1
 
 
     def numbers_for_time( self , hour, minute ):
@@ -92,28 +109,49 @@ class ClockDisplay():
         return [ int(h[0]), int(h[1]), int(m[0]), int(m[1]) ]
 
 
+    def mask_for_numbersets( self, numbers, numbers_last ):
+        mask = [ False for n in numbers ]
+        for i in range( len(numbers_last) ):
+            if numbers_last[i] != numbers[i]:
+                mask[i] = True
+        return mask
+
+
     def display_time( self, hour, minute ):
 
-        # draw_half will be set if the time changes. used for cheap animation on change.
-        draw_half = False
+        # has_changed will be set if the time changes. used for cheap animation on change.
+        has_changed = False
         # keep track of how long we've been displaying a given timestamp
         self.ts_age += 1
         if (minute != self.last_minute) or (hour != self.last_hour):
             self.ts_age = 0
-            draw_half = True
+            has_changed = True
 
         self.window.fill( self.background_colour )
         
         numbers = self.numbers_for_time( hour, minute )
-        if draw_half:
-            # if time has changed, for this frame draw new time in the top half...
-            self.display_numbers( numbers, segment=self.SEGMENT_UPPER )
-            # ... and old time in the bottom half for cheap flip effect
+        # default mask - draw everything
+        mask = [ True for i in range(len(numbers)) ]
+
+        if has_changed:
+
+            # draw changed numbers
+
             numbers_last = self.numbers_for_time( self.last_hour, self.last_minute )
-            self.display_numbers( numbers_last, segment=self.SEGMENT_LOWER )
-        else:
-            # otherwise, just draw the time
-            self.display_numbers( numbers, segment=self.SEGMENT_BOTH )
+            
+            # calculate mask for changed numbers
+            mask = self.mask_for_numbersets( numbers, numbers_last )
+
+            # if time has changed, for this frame draw new time in the top half...
+            self.display_numbers( numbers, segment=self.SEGMENT_UPPER, mask=mask )
+            # ... and old time in the bottom half for cheap flip effect
+            self.display_numbers( numbers_last, segment=self.SEGMENT_LOWER, mask=mask )
+            
+            # invert mask so that main draw will pick up everything that's not changed  
+            mask = [ not m for m in mask ]
+        
+        # draw unchanged numbers
+        self.display_numbers( numbers, segment=self.SEGMENT_BOTH, mask=mask )
         
         # draw split line down the horizontal middle
         pygame.draw.line( self.window, self.background_colour, (0,136-1), (480,136-1), 2 )
@@ -124,7 +162,7 @@ class ClockDisplay():
 
     def update( self, dt ):
 
-        self.display_time( dt.hour, dt.minute )    
+        self.display_time( dt.hour, dt.second )    
         pygame.display.flip()
 
         # handle exits
