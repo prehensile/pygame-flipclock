@@ -162,7 +162,7 @@ class ClockDisplay():
 
     def update( self, dt ):
 
-        self.display_time( dt.hour, dt.second )    
+        self.display_time( dt.hour, dt.minute )    
         pygame.display.flip()
 
         # handle exits
