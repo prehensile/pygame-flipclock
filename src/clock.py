@@ -27,7 +27,6 @@ class ClockDisplay():
     def init_pygame( self, native_width=480, native_height=272 ):
 
         self.background_colour = ( 255,255,255 )
-        self.fps = 8
 
         pygame.init()
         
@@ -160,7 +159,7 @@ class ClockDisplay():
         self.last_hour = hour
 
 
-    def update( self, dt ):
+    def update( self, dt, fps=8 ):
 
         self.display_time( dt.hour, dt.minute )    
         pygame.display.flip()
@@ -175,20 +174,30 @@ class ClockDisplay():
                     was_quit = True
         
         if not was_quit:
-            self.clock.tick( self.fps )
+            self.clock.tick( fps )
         
         return was_quit
 
 
 
 if __name__ == '__main__':
-    cd = ClockDisplay( os.path.realpath( "./images" ) )
+
+    # get containing path of this script
+    pth_self = os.path.realpath(
+        os.path.dirname( __file__ ) 
+    )
+
+    # start new clock display, using this path
+    cd = ClockDisplay(
+        os.path.join( pth_self, "./images" )
+    )
     
+    # main runloop
     was_quit = False
-    fps = 50
+    fps = 8
     while not was_quit:
         dt = datetime.datetime.now()
-        was_quit = cd.update( dt )
+        was_quit = cd.update( dt, fps=fps )
         
         
 
