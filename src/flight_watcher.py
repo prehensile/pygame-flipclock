@@ -1,63 +1,56 @@
-from opensky_api import OpenSkyApi, StateVector
 import requests
 import time
 import json
-import sqlite3
+import datetime
+
 import random
 
+import airports
+import flightaware
+import opensky
 
-opensky_data = None
-with open( "data/opensky.json" ) as fp:
-    opensky_data = json.load( fp )
-
-opensky = OpenSkyApi(
-    opensky_data["auth"]["username"],
-    opensky_data["auth"]["password"]
-)
-
-conn = sqlite3.connect( "data/airports.sqlite")
-cur = conn.cursor()
 
 flight_window = 60 * 60 * 24
-bbox = tuple( opensky_data["bbox"] )
 
+def print_flight( dep_icao=None, arr_icao=None, callsign=None  ):
 
-def airport_for_icao( icao ):
-    cur.execute( 'SELECT * FROM airports WHERE icao=?', (icao,) )
-    return cur.fetchone()
-
-def format_airport( airport ):
-    return "{} ({},{})".format(
-        airport[1],
-        airport[2],
-        airport[3]
-    )
-
-def formatted_airport_for_icao( icao ): 
-    return format_airport( airport_for_icao(icao) )
-
-def print_flight( j ):
-
-    dep_icao = j["estDepartureAirport"]
-    arr_icao = j["estArrivalAirport"]
+    
 
     dep_airport = None
     arr_airport = None
 
     if( dep_icao ):
-        dep_airport = formatted_airport_for_icao( dep_icao )
+        dep_airport = airports.formatted_airport_for_icao( dep_icao )
     
     if( arr_icao ):
-        arr_airport = formatted_airport_for_icao( arr_icao )
+        arr_airport = airports.formatted_airport_for_icao( arr_icao )
     
-    display_line = "{} from {} to {}".format(
-        j["callsign"].strip(),
+    display_line = "{}: {} from {} to {}".format(
+        datetime.datetime.now(),
+        callsign.strip(),
         dep_airport,
         arr_airport   
     )
 
     print( display_line )
 
+
+def print_opensky_flight( j ):
+    print_flight(
+        dep_icao = j["estDepartureAirport"],
+        arr_icao = j["estArrivalAirport"],
+        callsign = j["callsign"]
+    )
+
+
+def print_flightaware_flight( f ):
+    print_flight(
+        dep_icao = f['origin'],
+        arr_icao = f['destination'],
+        callsign = f['ident']
+    )
+
+bbox = tuple( opensky.config["bbox"] )
 
 while True:
 
@@ -72,26 +65,42 @@ while True:
         r = opensky.get_states( bbox=bbox )
     
         if (r is not None) and r.states:
-            print( r.states )
+            
             for state in r.states: 
+
+                print( "{}: Found a flight with callsign {}".format(
+                    datetime.datetime.now(),
+                    state.callsign
+                ))
+
                 state_time = state.time_position
+                
                 if state_time:
-                    req = requests.get(
-                        "https://opensky-network.org/api/flights/aircraft",
-                        params={
-                            "icao24" : state.icao24,
-                            "begin" : state_time - flight_window,
-                            "end" : state_time + flight_window
-                        }
-                    )
-                
-                    if req.status_code == 200:
-                        j = req.json()
-                
-                        for flight in j:
-                            print_flight( flight )
+                    
+                    flights = None
+                    icao24 = state.icao24,
+                    
+                    # first, attempt to get flight info from opensky
+                    try:
+                        flights = opensky.get_flights(
+                            icao24 = icao24,
+                            begin = state_time - flight_window,
+                            end = state_time + flight_window
+                        )
+                        for flight in flights:
+                            print_opensky_flight( flight )
+                    except Exception as e:
+                        pass
+                    
+                    # if that fails, try flightaware
+                    if flights is None or len(flights) < 1:
+                        flights = flightaware.flight_info( icao24 )
+                        for flight in flights:
+                            print_flightaware_flight( flight )
+                        
     
     except Exception as e:
-        print( repr(e) )
+        # print( repr(e) )
+        pass
 
     time.sleep( 30.0 )  
