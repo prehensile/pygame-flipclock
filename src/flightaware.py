@@ -25,6 +25,8 @@ def request( endpoint, payload ):
 def flight_info( ident, how_many=1 ):
     payload = { "ident" : ident, "howMany" : how_many }
     req = request( 'FlightInfo', payload )
+    if "error" in req:
+        raise Exception( req["error"] )
     return( req['FlightInfoResult']['flights'] )
 
 

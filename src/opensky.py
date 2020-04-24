@@ -7,6 +7,8 @@ config = None
 with open( "data/opensky.json" ) as fp:
     config = json.load( fp )
 
+print( config )
+
 api = OpenSkyApi(
     config["auth"]["username"],
     config["auth"]["password"]
@@ -29,3 +31,19 @@ def get_flights( icao24=None, begin=None, end=None ):
 
     if req.status_code == 200:
         return req.json()
+    else:
+        print( req )
+        print( req.status_code )
+        print( req.text )
+
+
+if __name__ == "__main__":
+    import time
+    ts = int( time.time() )
+    print(
+        get_flights(
+            icao24 = "BCS395",
+            begin = ts - (60*60*24),
+            end = ts
+        )
+    )
