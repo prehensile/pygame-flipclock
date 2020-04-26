@@ -9,7 +9,7 @@ def airport_for_icao( icao ):
 
 
 def format_airport( airport ):
-    return "{} ({},{})".format(
+    return "{} ({}, {})".format(
         airport[1],
         airport[2],
         airport[3]
