@@ -3,16 +3,17 @@ import requests
 
 from opensky_api import OpenSkyApi, StateVector
 
+
 config = None
 with open( "data/opensky.json" ) as fp:
     config = json.load( fp )
 
-print( config )
 
 api = OpenSkyApi(
     config["auth"]["username"],
     config["auth"]["password"]
 )
+
 
 def get_states( *args, **kwargs ):
     return( api.get_states( **kwargs ) )

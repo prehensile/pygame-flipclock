@@ -2,6 +2,7 @@ import requests
 import time
 import json
 import datetime
+import logging
 
 import random
 
@@ -46,8 +47,23 @@ def format_flightaware_flight( f ):
         callsign = f['ident']
     )
 
-bbox = tuple( opensky.config["bbox"] )
 
+def whittle_flightaware_flights( flights ):
+    candidate_flight = None
+    ptr = len( flights ) -1
+    while ptr > -1:
+        candidate_flight = flights[ ptr ]
+        o = candidate_flight['origin']
+        d = candidate_flight['destination']
+        if (d is not None) and (o is not None) and (len(o) > 0) and (len(d)>0):
+            break
+        ptr -= 1
+    if candidate_flight is None:
+        candidate_flight = flights[-1]
+    return candidate_flight
+
+
+bbox = tuple( opensky.config["bbox"] )
 
 def get_flight_info( icao24=None, callsign=None, timestamp=None ):
     
@@ -56,39 +72,38 @@ def get_flight_info( icao24=None, callsign=None, timestamp=None ):
         timestamp = int( time.time() )
                     
     # first, attempt to get flight info from opensky
-    try:
-        print( "-> attempt to get flight info from opensky")
-        flights = opensky.get_flights(
-            icao24 = icao24,
-            begin = timestamp - flight_window,
-            end = timestamp + flight_window
-        )
-        print( "--> flights: {}".format( repr(flights)) )
-        if flights is not None:
-            #for flight in flights:
-                # print_opensky_flight( flight )?
-            return format_opensky_flight( flights[-1] )
-    except Exception as e:
-        return( "opensky.get_flights failed: {}".format(
-            repr(e)
-        ))
+    # try:
+    #     print( "-> attempt to get flight info from opensky")
+    #     flights = opensky.get_flights(
+    #         icao24 = icao24,
+    #         begin = timestamp - flight_window,
+    #         end = timestamp + flight_window
+    #     )
+    #     print( "--> flights: {}".format( repr(flights)) )
+    #     if flights is not None:
+    #         #for flight in flights:
+    #             # print_opensky_flight( flight )?
+    #         return format_opensky_flight( flights[-1] )
+    # except Exception as e:
+    #     return( "opensky.get_flights failed: {}".format(
+    #         repr(e)
+    #     ))
 
     # if that fails, try flightaware
     if (flights is None) or len(flights) < 1:
-        print( "-> attempt to get flight info from flightaware")
+        logging.debug( "-> attempt to get flight info from flightaware")
         try:
-            flights = flightaware.flight_info( callsign )
-            #print( flights )
+            flights = flightaware.flight_info( callsign, how_many=3 )
+            logging.debug( flights )
         # for flight in flights:
         #     print_flightaware_flight( flight )
-            return format_flightaware_flight( flights[-1] )
+            return format_flightaware_flight( whittle_flightaware_flights( flights ) )
+
         except Exception as e:
             return( "flightaware.flight_info failed: {}".format(
             repr(e)
         ))
-        
 
-print( "DEBUG: {}".format( get_flight_info( icao24="3c71a4", callsign="BCS395", timestamp=int(time.time()) ) ) )
 
 last_seen_icao24 = None
 while True:
