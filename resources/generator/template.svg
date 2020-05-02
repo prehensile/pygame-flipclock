@@ -9,6 +9,6 @@
 <rect x="0" y="0" width="112" height="256" fill="black" rx="8"/>
 <!-- <rect x="12" y="30" width="88" height="196" fill="black" stroke="red"/> -->
 <text x="50%" y="225" text-anchor="middle" class="number">$glyph</text>
-<rect x="0" y="50%" width="100%" height="1" stroke="red"/>
+<!-- <rect x="0" y="50%" width="100%" height="1" stroke="red"/> -->
 
 </svg>
