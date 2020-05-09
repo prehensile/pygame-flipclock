@@ -3,6 +3,7 @@ import time
 import json
 import datetime
 import logging
+import sys
 
 import random
 
@@ -43,6 +44,7 @@ def format_opensky_flight( j ):
 
 
 def format_flightaware_flight( f ):
+    print( f )
     return format_flight(
         dep_icao = f['origin'],
         arr_icao = f['destination'],
@@ -126,10 +128,13 @@ def get_flight_info( icao24=None, callsign=None, timestamp=None ):
     # if that fails, try flightaware
     if (flights is None) or len(flights) < 1:
         try:
-            flights = flightaware.flight_info( callsign, how_many=3 )
+            flights = flightaware.combined_flight_info( callsign )
             if (flights is not None) and len( flights ) > 0:
-                return format_flightaware_flight( whittle_flightaware_flights( flights ) )
+                return format_flightaware_flight(
+                    whittle_flightaware_flights( flights )
+                )
         except Exception as e:
+            raise
             return( "flightaware.flight_info failed: {}".format(
                 repr(e)
             ))
@@ -153,6 +158,10 @@ def get_flight_info( icao24=None, callsign=None, timestamp=None ):
 bbox = tuple( opensky.config["bbox"] )
 
 print( "hello")
+if len(sys.argv) > 0:
+    ident = sys.argv[1]
+    print( get_flight_info( callsign=ident) )
+
 
 last_seen_icao24 = None
 while True:

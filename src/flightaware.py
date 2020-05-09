@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import sys
+from collections import namedtuple
 
 import requests
 
@@ -11,6 +12,20 @@ with open( 'data/flightaware.json' ) as fp:
 
 fxml_root = "https://flightxml.flightaware.com/json/FlightXML2/"
 fxml_auth = ( config["username"], config["api_key"] )
+
+
+FlightInfo = namedtuple( "FlightInfo", ("origin","destination","ident") )
+def sanitise_icao( icao ):
+    if re.match( '[A-Z]{4}', icao ):
+        return icao
+def info_factory( origin, destination, ident ):
+    # return FlightInfo( origin, destination, ident )
+    return {
+        "origin" : sanitise_icao( origin ),
+        "destination" : sanitise_icao( destination ),
+        "ident" :  ident
+    }
+
 
 def request( endpoint, payload ):
     
@@ -31,7 +46,9 @@ def flight_info( ident, how_many=1 ):
     req = request( 'FlightInfo', payload )
     if "error" in req:
         raise Exception( req["error"] )
-    return( req['FlightInfoResult']['flights'] )
+    flights = req['FlightInfoResult']['flights']
+    flights = [ info_factory( f["origin"], f["destination"], f["ident"] ) for f in flights ]
+    return( flights )
 
 
 def search( query, how_many=1 ):
@@ -53,19 +70,22 @@ def scrape_flight_info( ident ):
     # parse it
     j = json.loads( m.group(1) )
     f = j["flights"]
-    # get key for first flight in data object
-    k = next(iter(f))
-    # retrieve data for first flight
-    this_flight = f[k] 
-    # data is the object we'll return, with the same keys as flight_info result
-    data = {}
-    if this_flight["origin"]:
-        data[ "origin" ] = this_flight[ "origin" ][ "icao" ]
-    if this_flight["destination"]:
-        data[ "destination" ] = this_flight[ "destination" ][ "icao" ] 
-    if this_flight["ident"]:
-        data[ "ident" ] = this_flight[ "ident" ]
-    return data
+
+    # flight_info returns an array of flights, so let's make one
+    flights_out = []
+    # iterate through scraped flights
+    for k in f:
+        this_flight = f[k] 
+        # data is the object we'll return, with the same keys as flight_info result
+        data = {}
+        if this_flight["origin"]:
+            data[ "origin" ] = this_flight[ "origin" ][ "icao" ]
+        if this_flight["destination"]:
+            data[ "destination" ] = this_flight[ "destination" ][ "icao" ] 
+        if this_flight["ident"]:
+            data[ "ident" ] = this_flight[ "ident" ]
+
+    return flights_out
 
 
 def combined_flight_info( ident ):

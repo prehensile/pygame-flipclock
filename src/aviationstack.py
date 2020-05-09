@@ -17,7 +17,7 @@ def make_request( endpoint, params={} ):
 
     r = requests.get( url, params )
 
-    print( r.text )
+    # print( r.text )
 
     return r.json()["data"]
 
