@@ -11,6 +11,7 @@ import flightaware
 import opensky
 import airportinfo
 import aviationstack
+import flightradar24
 
 
 flight_window = 60 * 60 * 24
@@ -74,18 +75,24 @@ def whittle_flightaware_flights( flights ):
 
 
 
-def flight_info_opensky( icao24, timestamp ):
+def flight_info_opensky( icao24=None, callsign=None, timestamp=None ):
     print( "-> attempt to get flight info from opensky")
-    flights = opensky.get_flights(
-        icao24 = icao24,
-        begin = timestamp - flight_window,
-        end = timestamp + flight_window
+    # flights = opensky.get_flights(
+    #     icao24 = icao24,
+    #     begin = timestamp - flight_window,
+    #     end = timestamp + flight_window
+    # )
+    # print( "--> flights: {}".format( repr(flights)) )
+    # if flights is not None:
+    #     return format_opensky_flight( flights[-1] )
+    r = opensky.get_route( callsign )
+    route = r["route"]
+    return format_flight(
+        dep_icao = route[0],
+        arr_icao = route[1],
+        callsign = callsign
     )
-    print( "--> flights: {}".format( repr(flights)) )
-    if flights is not None:
-        #for flight in flights:
-            # print_opensky_flight( flight )?
-        return format_opensky_flight( flights[-1] )
+
 
 
 def formatted_flight_info_flightaware( callsign ):
@@ -107,6 +114,16 @@ def flight_info_aviationstack( icao24 ):
     )
 
 
+def flight_info_flightradar24( callsign ):
+    flights = flightradar24.flight_info( callsign )
+    f = flights[0]
+    return format_flight(
+        dep_icao = f.origin,
+        arr_icao = f.destination,
+        callsign = callsign
+    )
+
+
 
 def get_flight_info( icao24=None, callsign=None, timestamp=None ):
     
@@ -115,33 +132,39 @@ def get_flight_info( icao24=None, callsign=None, timestamp=None ):
         timestamp = int( time.time() )
                     
     # first, attempt to get flight info from opensky
-    # try:
-    #     return flight_info_opensky()
-    # except Exception as e:
-    #     return( "opensky.get_flights failed: {}".format(
-    #         repr(e)
-    #     ))
+    try:
+        return flight_info_opensky( icao24=icao24, callsign=callsign, timestamp=timestamp )
+    except Exception as e:
+        print( "opensky.get_flights failed: {}".format(
+            repr(e)
+        ))
 
 
     # if that fails, try flightaware
-    if (flights is None) or len(flights) < 1:
-        try:
-            flights = flightaware.flight_info( callsign, how_many=3 )
-            if (flights is not None) and len( flights ) > 0:
-                return format_flightaware_flight( whittle_flightaware_flights( flights ) )
-        except Exception as e:
-            return( "flightaware.flight_info failed: {}".format(
-                repr(e)
-            ))
+    try:
+        flights = flightaware.flight_info( callsign, how_many=3 )
+        if (flights is not None) and len( flights ) > 0:
+            return format_flightaware_flight( whittle_flightaware_flights( flights ) )
+    except Exception as e:
+        print( "flightaware.flight_info failed: {}".format(
+            repr(e)
+        ))
     
-    if (flights is None) or len(flights) < 1:
-        try:
-            print( "fallback to aviationstack")
-            return flight_info_aviationstack( callsign )
-        except Exception as e:
-            return( "flight_info_aviationstack failed: {}".format(
-                repr(e)
-            ))
+    try:
+        print( "fallback to aviationstack")
+        return flight_info_aviationstack( callsign )
+    except Exception as e:
+        print( "flight_info_aviationstack failed: {}".format(
+            repr(e)
+        ))
+    
+    try:
+        print( "fallback to flightradar24")
+        return flight_info_flightradar24( callsign )
+    except Exception as e:
+        print( "flight_info_flightradar24 failed: {}".format(
+            repr(e)
+        ))
     
     # if flights is None:
     #     flight_info = airportinfo.flight_info( icao24 )
@@ -167,6 +190,7 @@ while True:
 
         r = opensky.get_states( bbox=bbox )
         # print( r )
+        #r = opensky.get_states()
     
         if (r is not None) and r.states:
             
