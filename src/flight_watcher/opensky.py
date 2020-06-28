@@ -19,6 +19,22 @@ def get_states( *args, **kwargs ):
     return( api.get_states( **kwargs ) )
 
 
+def get_route( callsign ):
+    req = requests.get(
+        "https://opensky-network.org/api/routes",
+        params={
+            "callsign" : callsign,
+        }
+    )
+
+    if req.status_code == 200:
+        return req.json()
+    else:
+        print( req )
+        print( req.status_code )
+        print( req.text )
+
+
 def get_flights( icao24=None, begin=None, end=None ):
     
     req = requests.get(
