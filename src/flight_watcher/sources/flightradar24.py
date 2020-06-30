@@ -16,13 +16,18 @@ def flight_info( callsign ):
             'User-Agent': "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:77.0) Gecko/20100101 Firefox/77.0"
         }
     )
+    
     j = r.json()
-    flights_out = []
-    for flight in j["result"]["response"]["data"]:
-        origin = flight["airport"]["origin"]["code"]["icao"]
-        destination = flight["airport"]["destination"]["code"]["icao"]
-        flights_out.append( Flight( Airport(origin), Airport(destination) ) )
-    return flights_out
+
+    flights = map(
+        lambda f: Flight(
+            Airport( f["airport"]["origin"]["code"]["icao"] ),
+            Airport( f["airport"]["destination"]["code"]["icao"] )
+        ),
+        j["result"]["response"]["data"]
+    )
+
+    return flights
 
 
 if __name__ == "__main__":

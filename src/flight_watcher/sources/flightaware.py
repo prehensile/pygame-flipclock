@@ -2,12 +2,16 @@ import requests
 import json
 import sys
 
+from model import Flight, Airport
+
+
 config = None
 with open( 'data/flightaware.json' ) as fp:
     config = json.load( fp )
 
 fxml_root = "https://flightxml.flightaware.com/json/FlightXML2/"
 fxml_auth = ( config["username"], config["api_key"] )
+
 
 def request( endpoint, payload ):
     
@@ -20,7 +24,16 @@ def request( endpoint, payload ):
     if response.status_code == 200:
         return response.json()
     else:
-        print( "Error executing request" )
+        raise Exception( response.text )
+
+
+def parse_flights( flights ):
+    return map(
+        lambda f: Flight(
+            Airport( f['origin'] ),
+            Airport( f['destination'] )
+        ) 
+    )
 
 
 def flight_info( ident, how_many=1 ):
@@ -28,7 +41,8 @@ def flight_info( ident, how_many=1 ):
     req = request( 'FlightInfo', payload )
     if "error" in req:
         raise Exception( req["error"] )
-    return( req['FlightInfoResult']['flights'] )
+    flights = req['FlightInfoResult']['flights'] )
+    return parse_flights( flights )
 
 
 def search( query, how_many=1 ):
@@ -37,6 +51,7 @@ def search( query, how_many=1 ):
     if "error" in req:
         raise Exception( req["error"] )
     return( req )
+
 
 if __name__ == "__main__":
     # payload = {'airport':'KSFO', 'howMany':'10'}

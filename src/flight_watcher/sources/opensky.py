@@ -1,7 +1,9 @@
 import json
-import requests
 
-from opensky_api import OpenSkyApi, StateVector
+import requests
+from sources.opensky_api import OpenSkyApi, StateVector
+
+from model import Airport, Flight
 
 
 config = None
@@ -30,9 +32,7 @@ def get_route( callsign ):
     if req.status_code == 200:
         return req.json()
     else:
-        print( req )
-        print( req.status_code )
-        print( req.text )
+        raise Exception( req.status_code )
 
 
 def get_flights( icao24=None, begin=None, end=None ):
@@ -47,11 +47,20 @@ def get_flights( icao24=None, begin=None, end=None ):
     )
 
     if req.status_code == 200:
-        return req.json()
+        j = req.json()
+        flights = map(
+            lambda f: Flight(
+                Airport( f["estDepartureAirport"] ),
+                Airport( f["estArrivalAirport"] )
+            ),
+            j
+        )
+        return flights
     else:
-        print( req )
-        print( req.status_code )
-        print( req.text )
+        # print( req )
+        # print( req.status_code )
+        # print( req.text )
+        raise Exception( req.text )
 
 
 if __name__ == "__main__":

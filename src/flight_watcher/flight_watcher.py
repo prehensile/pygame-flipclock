@@ -3,8 +3,8 @@ import time
 import json
 import datetime
 import logging
-
 import random
+from collections import defaultdict
 
 import airports
 import flightaware
@@ -12,6 +12,8 @@ import opensky
 import airportinfo
 import aviationstack
 import flightradar24
+
+from model import Airport, Flight
 
 
 flight_window = 60 * 60 * 24
@@ -35,83 +37,13 @@ def format_flight( dep_icao=None, arr_icao=None, callsign=None  ):
     )
 
 
-def format_opensky_flight( j ):
-    return format_flight(
-        dep_icao = j["estDepartureAirport"],
-        arr_icao = j["estArrivalAirport"],
-        callsign = j["callsign"]
-    )
 
-
-def format_flightaware_flight( f ):
-    return format_flight(
-        dep_icao = f['origin'],
-        arr_icao = f['destination'],
-        callsign = f['ident']
-    )
-
-
-def format_airportinfo_flight( f ):
-    return format_flight(
-        dep_icao = f['departure_icao_code'],
-        arr_icao = f['arrival_icao_code'],
-        callsign = f['flight_icao_number']
-    )
-
-
-
-def whittle_flightaware_flights( flights ):
-    candidate_flight = flights[-1]
-    ptr = len( flights ) -1
-    while ptr > -1:
-        c = flights[ ptr ]
-        o = c['origin']
-        d = c['destination']
+def whittle_flights( flights ):
+    for flight in flights:
+        o = flight.origin
+        d = flight.destintion
         if (d is not None) and (o is not None) and (len(o) > 0) and (len(d)>0):
-            break
-        ptr -= 1
-    return candidate_flight
-
-
-
-
-def flight_info_opensky( icao24=None, callsign=None, timestamp=None ):
-    print( "-> attempt to get flight info from opensky")
-    # flights = opensky.get_flights(
-    #     icao24 = icao24,
-    #     begin = timestamp - flight_window,
-    #     end = timestamp + flight_window
-    # )
-    # print( "--> flights: {}".format( repr(flights)) )
-    # if flights is not None:
-    #     return format_opensky_flight( flights[-1] )
-    r = opensky.get_route( callsign )
-    route = r["route"]
-    return format_flight(
-        dep_icao = route[0],
-        arr_icao = route[1],
-        callsign = callsign
-    )
-
-
-
-def formatted_flight_info_flightaware( callsign ):
-    logging.debug( "-> attempt to get flight info from flightaware")
-    flights = flightaware.flight_info( callsign, how_many=3 )
-    logging.debug( flights )
-# for flight in flights:
-#     print_flightaware_flight( flight )
-    return format_flightaware_flight( whittle_flightaware_flights( flights ) )
-
-
-def flight_info_aviationstack( icao24 ):
-    flights = aviationstack.get_flights( icao24 )
-    f = flights[0]
-    return format_flight(
-        dep_icao = f['departure']['icao'],
-        arr_icao = f['arrival']['icao'],
-        callsign = f['flight']['icao']
-    )
+            return flight
 
 
 def flight_info_flightradar24( callsign ):
@@ -124,16 +56,44 @@ def flight_info_flightradar24( callsign ):
     )
 
 
+success_counts = defaultdict(1)
 
 def get_flight_info( icao24=None, callsign=None, timestamp=None ):
     
-    flights = None
     if timestamp is None:
         timestamp = int( time.time() )
                     
-    # first, attempt to get flight info from opensky
+    # first, attempt to get route info from opensky
     try:
-        return flight_info_opensky( icao24=icao24, callsign=callsign, timestamp=timestamp )
+        print( "Attempt to get flight info from opensky")
+        r = opensky.get_route( callsign )
+        route = r["route"]
+        flights = [
+            Flight( 
+                Airport( route[0] ),
+                Airport( route[-1] )
+            )
+        ]
+        success_counts[ "opensky-routes" ] += 1
+        return flights
+    except Exception as e:
+        print( "opensky.get_route failed: {}".format(
+            repr(e)
+        ))
+    
+
+    # if that fails, attempt to get flight info from opensky
+    try:
+        print( "Attempt to get flight info from opensky")
+            flights = opensky.get_flights(
+                icao24 = icao24,
+                begin = timestamp - flight_window,
+                end = timestamp + flight_window
+            )
+            if len( flights ) > 0: 
+                success_counts[ "opensky-flights" ] += 1
+                # opensky flights have the newest at the end of the list
+                return reversed( flights )
     except Exception as e:
         print( "opensky.get_flights failed: {}".format(
             repr(e)
@@ -142,9 +102,12 @@ def get_flight_info( icao24=None, callsign=None, timestamp=None ):
 
     # if that fails, try flightaware
     try:
+        print( "fallback to flightaware")
         flights = flightaware.flight_info( callsign, how_many=3 )
-        if (flights is not None) and len( flights ) > 0:
-            return format_flightaware_flight( whittle_flightaware_flights( flights ) )
+        if len( flights ) > 0:
+            success_counts[ "flightaware" ] += 1
+            # flightaware flights have the newest at the end of the list
+            return reversed( flights )
     except Exception as e:
         print( "flightaware.flight_info failed: {}".format(
             repr(e)
@@ -152,7 +115,10 @@ def get_flight_info( icao24=None, callsign=None, timestamp=None ):
     
     try:
         print( "fallback to aviationstack")
-        return flight_info_aviationstack( callsign )
+        flights = aviationstack.get_flights( icao24 )
+        if len( flights ) > 1:
+            success_counts[ "aviationstack" ] += 1
+            return flights
     except Exception as e:
         print( "flight_info_aviationstack failed: {}".format(
             repr(e)
@@ -160,7 +126,9 @@ def get_flight_info( icao24=None, callsign=None, timestamp=None ):
     
     try:
         print( "fallback to flightradar24")
-        return flight_info_flightradar24( callsign )
+        flights = flightradar24.flight_info( callsign )
+        if len( flights ) > 1:
+            return flights
     except Exception as e:
         print( "flight_info_flightradar24 failed: {}".format(
             repr(e)
