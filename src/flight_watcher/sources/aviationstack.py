@@ -5,6 +5,7 @@ import logging
 import requests
 
 from model import Airport, Flight
+from sources import utils
 
 
 config = None
@@ -23,12 +24,15 @@ def make_request( endpoint, params={} ):
 
 
 def parse_flights( j ):
-    return map(
-        lambda f: Flight(
-            Airport( f['departure']['icao'] ),
-            Airport( f['arrival']['icao'] )
-        ),
-        j
+    # return map(
+    #     lambda f: Flight(
+    #         Airport( f['departure']['icao'] ),
+    #         Airport( f['arrival']['icao'] )
+    #     ),
+    #     j
+    # )
+    return utils.parse_flights(
+        j, "departure.icao", "arrival.icao"
     )
 
 
@@ -39,7 +43,7 @@ def get_flights( icao=None ):
             "flight_icao" : icao
         }
     )
-    return( parse_flights(j) )
+    return parse_flights(j)
 
 
 if __name__ == "__main__":

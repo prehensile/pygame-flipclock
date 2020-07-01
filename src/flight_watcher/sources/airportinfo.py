@@ -7,15 +7,20 @@ import cloudscraper
 import requests
 
 from model import Flight, Airport
+from sources import utils
 
 
-def parse_flightdata( o ):
-    return(
-        Flight(
-            Airport( o['departure_icao_code'] ),
-            Airport( o['arrival_icao_code'] )
-        )
+def parse_flight( o ):
+    # return(
+    #     Flight(
+    #         Airport( o['departure_icao_code'] ),
+    #         Airport( o['arrival_icao_code'] )
+    #     )
+    # )
+    return utils.parse_flight(
+        o, "departure_icao_code", "arrival_icao_code"
     )
+
 
 
 def flight_info( callsign ):
@@ -26,7 +31,7 @@ def flight_info( callsign ):
     m = re.search( "var flightdata = (.*);", r.text )
     o = json.loads( m.group(1) )
     return(
-        [parse_flightdata(o)]
+        [parse_flight(o)]
     )
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import requests
 from sources.opensky_api import OpenSkyApi, StateVector
 
 from model import Airport, Flight
+from sources import utils
 
 
 config = None
@@ -35,6 +36,19 @@ def get_route( callsign ):
         raise Exception( req.status_code )
 
 
+def parse_flights( j ):
+    return utils.parse_flights(
+        j, "estDepartureAirport", "estArrivalAirport"
+    )
+    # return map(
+    #     lambda f: Flight(
+    #         Airport( f["estDepartureAirport"] ),
+    #         Airport( f["estArrivalAirport"] )
+    #     ),
+    #     j
+    # )
+
+
 def get_flights( icao24=None, begin=None, end=None ):
     
     req = requests.get(
@@ -48,14 +62,7 @@ def get_flights( icao24=None, begin=None, end=None ):
 
     if req.status_code == 200:
         j = req.json()
-        flights = map(
-            lambda f: Flight(
-                Airport( f["estDepartureAirport"] ),
-                Airport( f["estArrivalAirport"] )
-            ),
-            j
-        )
-        return flights
+        return parse_flights( j )
     else:
         # print( req )
         # print( req.status_code )
