@@ -1,170 +1,164 @@
 #!/usr/bin/env python
 
-import pygame
-import sys
+import datetime
 import os
 import random
 import re
+import sys
 import time
-import datetime
+
+import pygame
+from pygame import display, draw
 
 
-class ClockDisplay():
+class DigitCache( object ):
+    
+    images = {}
+    image_path = "images"
+
+    @classmethod
+    def image_for_character( cls, c ):
+        if c not in cls.images:
+            cls.images[c] = pygame.image.load(
+                os.path.join(
+                    cls.image_path,
+                    "{}.png".format( c )
+                )
+            )
+        return cls.images[c]
 
 
-    def __init__( self, image_path ):
+class ClockDigit( object ):
+
+    def __init__( self ):
+        self.image = None
+        self.next_image = None
+        self.transition_frame = 0
+        self.current_character = None
+        self.transition_delay = 0
+        self.is_dirty = False
+
+
+    def set_image( self, img ):
+        if img != self.image:
+            self.area = img.get_clip()
+            if self.image is None:
+                self.image = img
+            else:
+                self.next_image = img
+                self.transition_frame = 1
+            self.is_dirty = True
         
-        self.ts_age = 0
-        self.last_hour = 0
-        self.last_minute = 0
 
-        self.load_images( image_path )
-        self.init_pygame()
-        self.display_time( 0, 0 )
+
+    def set_character( self, c, delay=0 ):
+        if c != self.current_character:
+            self.set_image( DigitCache.image_for_character(c) )
+            self.current_character = c
+            self.transition_delay = delay
+            return True
+        return False
+
+
+    def draw( self, window, x, y ):
+       
+        window.blit( self.image, (x,y), area=self.area )
+
+        if self.transition_delay > 0:
+            self.transition_delay -= 1
         
+        elif (self.transition_frame > 0) and (self.next_image is not None):
+           
+            if self.transition_frame == 1:
+
+                brightness = 128 + 64
+               
+                # first frame of transition: top half of digit is new image, bottom half is old
+                r = self.next_image.get_clip()
+                r.height /=2
+                #r.top = r.height/2
+                window.blit( self.next_image, (x,y), r )
+                r.x = x
+                r.y = y
+                window.fill( (brightness,brightness,brightness), rect=r, special_flags=pygame.BLEND_MULT )
+            
+            self.transition_frame +=1
+
+            if self.transition_frame == 2:
+                self.image = self.next_image
+            
+            elif self.transition_frame == 3:
+                self.is_dirty = False
+                self.transition_frame = 0
+                self.next_image = None
 
 
-    def init_pygame( self, native_width=480, native_height=272 ):
+    def width( self ):
+        if self.image:
+            if self.area:
+                return self.area.width
+            return self.image.get_width()
+        return 0
 
-        self.background_colour = ( 255,255,255 )
+
+
+class NuDisplay( object ):
+
+    def __init__( self, num_digits=4 ):
+        self.digits = []
+        self.padding_x = 8
+        for i in range( num_digits ):
+            self.digits.append( ClockDigit() )
+
+
+    def draw( self, window, x=0, y=0 ):
+        for d in self.digits:
+            d.draw( window, x, y )
+            x += d.width() + self.padding_x
+
+    
+    def display_string( self, str ):
+        delay = 0
+        for i, d in enumerate(self.digits):
+            will_change = d.set_character( str[i], delay=delay )
+            if will_change:
+                delay += 1
+
+
+    def is_dirty( self ):
+        dirty = False
+        for d in self.digits:
+            dirty = dirty or d.is_dirty
+        return dirty
+
+
+
+class PygameHandler( object ):
+
+    def initialize( self, native_width=480, native_height=272 ):
 
         pygame.init()
         
         display_info = pygame.display.Info()
         w = display_info.current_w
         h = display_info.current_h
-        self.window_size=(w,h)
+        window_size=(w,h)
+        window = None
 
         if (w <= native_width) or (h <= native_height):
-            self.window = pygame.display.set_mode( self.window_size, pygame.FULLSCREEN )  
+            window = pygame.display.set_mode( window_size, pygame.FULLSCREEN )  
         else:
-            self.window = pygame.display.set_mode( (native_width, native_height) )
+            window = pygame.display.set_mode( (native_width, native_height) )
         
+        self.window = window
         self.surface = pygame.display.get_surface()
         
         pygame.mouse.set_visible( False )
 
-        self.clock = pygame.time.Clock()
+        return self.window, self.surface
 
 
-    def load_images( self, image_path ):
-        images = []
-        for i in range(10):
-            fn_image = "%d.png" % i
-            images.append(
-                pygame.image.load(
-                    os.path.join( image_path, fn_image )
-                )
-            )
-        self.number_surfaces = images
-
-    
-    SEGMENT_BOTH = 0
-    SEGMENT_UPPER = 1
-    SEGMENT_LOWER = 2
-    def display_number( self, number, pos, segment=SEGMENT_BOTH ):
-        
-        img = self.number_surfaces[ number ]
-        area = img.get_clip()
-        offs = [0,0]
-        
-        if segment == self.SEGMENT_UPPER:
-            area.height /=2
-        
-        elif segment == self.SEGMENT_LOWER:
-            hh = area.height /2
-            area.top = hh
-            area.height = hh
-            offs[1] = hh
-        
-        p = (pos[0]+offs[0],pos[1]+offs[1])
-        self.window.blit( img, p, area=area )
-
-        # draw a translucent black rect over *most* of a changing segement
-        # cheap, hacky transition effect!
-        if segment == self.SEGMENT_UPPER:
-            yo = 10
-            r = pygame.Rect( (p[0],p[1]+yo), (area.width,area.height-yo) )
-            brightness = 128 + 64
-            self.window.fill( (brightness,brightness,brightness), rect=r, special_flags=pygame.BLEND_MULT )
-
-
-    PADDING = 8
-    SPACING = 116
-    def display_numbers( self, numbers, segment=SEGMENT_BOTH, mask=None ):
-        pos = [self.PADDING,self.PADDING]
-        i = 0
-        for n in numbers:
-            if n is not None:
-                if (mask is None) or (mask and mask[i]):
-                    self.display_number( n, pos, segment=segment )    
-            pos[0] += self.SPACING
-            i += 1
-
-
-    def numbers_for_time( self , hour, minute ):
-        h = "%02d" % hour
-        m = "%02d" % minute
-        return [ int(h[0]), int(h[1]), int(m[0]), int(m[1]) ]
-
-
-    def mask_for_numbersets( self, numbers, numbers_last ):
-        mask = [ False for n in numbers ]
-        for i in range( len(numbers_last) ):
-            if numbers_last[i] != numbers[i]:
-                mask[i] = True
-        return mask
-
-
-    def display_time( self, hour, minute ):
-
-        # has_changed will be set if the time changes. used for cheap animation on change.
-        has_changed = False
-        # keep track of how long we've been displaying a given timestamp
-        self.ts_age += 1
-        if (minute != self.last_minute) or (hour != self.last_hour):
-            self.ts_age = 0
-            has_changed = True
-
-        self.window.fill( self.background_colour )
-        
-        numbers = self.numbers_for_time( hour, minute )
-        # default mask - draw everything
-        mask = [ True for i in range(len(numbers)) ]
-
-        if has_changed:
-
-            # draw changed numbers
-
-            numbers_last = self.numbers_for_time( self.last_hour, self.last_minute )
-            
-            # calculate mask for changed numbers
-            mask = self.mask_for_numbersets( numbers, numbers_last )
-
-            # if time has changed, for this frame draw new time in the top half...
-            self.display_numbers( numbers, segment=self.SEGMENT_UPPER, mask=mask )
-            # ... and old time in the bottom half for cheap flip effect
-            self.display_numbers( numbers_last, segment=self.SEGMENT_LOWER, mask=mask )
-            
-            # invert mask so that main draw will pick up everything that's not changed  
-            mask = [ not m for m in mask ]
-        
-        # draw unchanged numbers
-        self.display_numbers( numbers, segment=self.SEGMENT_BOTH, mask=mask )
-        
-        # draw split line down the horizontal middle
-        pygame.draw.line( self.window, self.background_colour, (0,136-1), (480,136-1), 2 )
-
-        self.last_minute = minute
-        self.last_hour = hour
-
-
-    def update( self, dt, fps=8 ):
-
-        self.display_time( dt.hour, dt.minute )    
-        pygame.display.flip()
-
-        # handle exits
+    def was_quit( self ):
         was_quit = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -172,39 +166,47 @@ class ClockDisplay():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     was_quit = True
-        
-        if not was_quit:
-            self.clock.tick( fps )
-        
         return was_quit
 
 
+bg_color = (255,255,255) 
+
+def update_display( window, surface, sr, d ):
+    if d.is_dirty():
+        window.fill( bg_color )
+        d.draw( window, 4, 8 )
+        # draw split line down the horizontal middle
+        pygame.draw.line( window, bg_color, (0,(sr.height/2)-1), (sr.width,(sr.height/2)-1), 2 )
+        pygame.display.flip()
+
+
+def main():
+
+    ph = PygameHandler()
+    window, surface = ph.initialize()
+    sr = surface.get_rect()
+    d = NuDisplay()
+    
+    d.display_string("HLLO")
+    update_display( window, surface, sr, d )
+    time.sleep( 3.0 )
+
+    q = False
+    last_string = None
+    fps = 12.0  
+    while not q:
+        dt = datetime.datetime.now()
+        ds = "{:02d}{:02d}".format( dt.second, dt.second )
+        if ds != last_string:
+            d.display_string( ds )
+            last_string = ds
+        
+        update_display( window, surface, sr, d )
+        
+        q = ph.was_quit()
+        if not q:
+            time.sleep( 1.0 / fps )
+
 
 if __name__ == '__main__':
-
-    # get containing path of this script
-    pth_self = os.path.realpath(
-        os.path.dirname( __file__ ) 
-    )
-
-    # start new clock display, using this path
-    cd = ClockDisplay(
-        os.path.join( pth_self, "./images" )
-    )
-    
-    # main runloop
-    was_quit = False
-    fps = 8
-    while not was_quit:
-        dt = datetime.datetime.now()
-        was_quit = cd.update( dt, fps=fps )
-        
-        
-
-        
-
-    
-
-
-
-
+    main()
