@@ -40,7 +40,6 @@ def whittle_flights( flights ):
     if flights is None:
         return
     for flight in flights:
-        print( flight )
         o = flight.origin
         d = flight.destination
         if (d is not None) and (o is not None) and (len(o) > 0) and (len(d)>0):
@@ -136,7 +135,7 @@ bbox = tuple( opensky.config["bbox"] )
 
 
 print( "hello")
-if len(sys.argv) > 0:
+if len(sys.argv) > 1:
     callsign = sys.argv[1]
     #utils.init_logging()
     flights = get_flight_info( callsign=callsign, icao24="4ca6c4" )
@@ -181,12 +180,11 @@ while True:
                 if icao24 and (icao24 != last_seen_icao24):
                     flights = get_flight_info( icao24=icao24, callsign=callsign, timestamp=timestamp )
                     if flights is not None:
-                        print( flights )
                         flight = whittle_flights( flights )
                         if flight is not None:
                             print( format_flight( flight, callsign ) )
                             last_seen_icao24 = icao24
-                            print( success_counts )
+                            print( "successes: " + repr(success_counts) )
 
                 break
                         

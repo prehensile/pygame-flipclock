@@ -20,20 +20,27 @@ def retrieve_value( source_object, key ):
 
 
 def parse_flight( source_object, origin_key, destination_key ):
-    origin = None
-    destination = None
+    origin_icao = None
+    destination_icao = None
 
     try:
-        origin = retrieve_value( source_object, origin_key )
+        origin_icao = retrieve_value( source_object, origin_key )
     except Exception as e:
         logging.exception( e )
     
     try:
-        destination = retrieve_value( source_object, destination_key )
+        destination_icao = retrieve_value( source_object, destination_key )
     except Exception as e:
         logging.exception( e )
+    
+    origin = None
+    destination = None
+    if len(origin_icao) > 1:
+        origin = Airport( origin_icao )
+    if len(destination_icao) > 1:
+        destination = Airport( destination_icao )
 
-    return Flight( Airport(origin), Airport(destination) )
+    return Flight( origin, destination )
 
 
 def parse_flights( flights, origin_key, destination_key ):
