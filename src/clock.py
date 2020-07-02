@@ -19,11 +19,21 @@ class DigitCache( object ):
     @classmethod
     def image_for_character( cls, c ):
         if c not in cls.images:
+            
+            pth_image = os.path.join(
+                cls.image_path,
+                "{}.png".format( c )
+            )
+            
+            if not os.path.exists(pth_image):
+                # fallback to hex representation of unicode point
+                pth_image = os.path.join(
+                cls.image_path,
+                "{}.png".format( hex(ord(c)) )
+            )
+            
             cls.images[c] = pygame.image.load(
-                os.path.join(
-                    cls.image_path,
-                    "{}.png".format( c )
-                )
+                pth_image
             )
         return cls.images[c]
 
@@ -188,6 +198,7 @@ def main():
     d = NuDisplay()
     
     d.display_string("HLLO")
+
     update_display( window, surface, sr, d )
     time.sleep( 3.0 )
 
