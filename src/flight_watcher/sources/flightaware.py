@@ -1,6 +1,11 @@
-import requests
 import json
+import logging
 import sys
+
+import requests
+
+from model import Airport, Flight
+from sources import utils
 
 config = None
 with open( 'data/flightaware.json' ) as fp:
@@ -8,6 +13,7 @@ with open( 'data/flightaware.json' ) as fp:
 
 fxml_root = "https://flightxml.flightaware.com/json/FlightXML2/"
 fxml_auth = ( config["username"], config["api_key"] )
+
 
 def request( endpoint, payload ):
     
@@ -17,10 +23,24 @@ def request( endpoint, payload ):
         auth=fxml_auth
     )
 
+    logging.debug( response.text )
+
     if response.status_code == 200:
         return response.json()
     else:
-        print( "Error executing request" )
+        raise Exception( response.text )
+
+
+def parse_flights( flights ):
+    # return map(
+    #     lambda f: Flight(
+    #         Airport( f['origin'] ),
+    #         Airport( f['destination'] )
+    #     ) 
+    # )
+    return utils.parse_flights(
+        flights, "origin", "destination"
+    )
 
 
 def flight_info( ident, how_many=1 ):
@@ -28,7 +48,8 @@ def flight_info( ident, how_many=1 ):
     req = request( 'FlightInfo', payload )
     if "error" in req:
         raise Exception( req["error"] )
-    return( req['FlightInfoResult']['flights'] )
+    flights = req['FlightInfoResult']['flights']
+    return parse_flights( flights )
 
 
 def search( query, how_many=1 ):
@@ -37,6 +58,7 @@ def search( query, how_many=1 ):
     if "error" in req:
         raise Exception( req["error"] )
     return( req )
+
 
 if __name__ == "__main__":
     # payload = {'airport':'KSFO', 'howMany':'10'}
@@ -47,4 +69,3 @@ if __name__ == "__main__":
     except Exception as e:
         query = "-identOrReg {}*".format(icao)
         print( search(query) )
-

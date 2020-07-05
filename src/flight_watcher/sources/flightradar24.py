@@ -1,6 +1,24 @@
 import requests
 
 from model import Flight, Airport
+from sources import utils
+
+
+def parse_flights( j ):
+
+    # return map(
+    #     lambda f: Flight(
+    #         Airport( f["airport"]["origin"]["code"]["icao"] ),
+    #         Airport( f["airport"]["destination"]["code"]["icao"] )
+    #     ),
+    #     j["result"]["response"]["data"]
+    # )
+
+    return utils.parse_flights(
+        j["result"]["response"]["data"],
+        "airport.origin.code.icao",
+        "airport.destination.code.icao"
+    )
 
 
 def flight_info( callsign ):
@@ -16,24 +34,12 @@ def flight_info( callsign ):
             'User-Agent': "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:77.0) Gecko/20100101 Firefox/77.0"
         }
     )
+    
     j = r.json()
-    flights_out = []
-    for flight in j["result"]["response"]["data"]:
-        origin = flight["airport"]["origin"]["code"]["icao"]
-        destination = flight["airport"]["destination"]["code"]["icao"]
-        flights_out.append( Flight( Airport(origin), Airport(destination) ) )
-    return flights_out
+    return parse_flights( j )
 
 
 if __name__ == "__main__":
     import sys
-    import logging
-
-    logging.basicConfig()
-    logging.getLogger().setLevel(logging.DEBUG)
-    requests_log = logging.getLogger("requests.packages.urllib3")
-    requests_log.setLevel(logging.DEBUG)
-    requests_log.propagate = True
-
     callsign = sys.argv[1]
     print( flight_info( callsign ) )

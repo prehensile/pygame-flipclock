@@ -1,20 +1,17 @@
 import sqlite3
 
-conn = sqlite3.connect( "data/airports.sqlite")
+from model import Airport
+
+
+conn = sqlite3.connect( "data/airports.sqlite", check_same_thread=False )
 cur = conn.cursor()
 
 def airport_for_icao( icao ):
     cur.execute( 'SELECT * FROM airports WHERE icao=?', (icao,) )
-    return cur.fetchone()
-
-
-def format_airport( airport ):
-    return "{} ({}, {})".format(
-        airport[1],
-        airport[2],
-        airport[3]
+    record = cur.fetchone()
+    return Airport(
+        icao = icao,
+        iata = record[1],
+        name = record[2],
+        country = record[3]
     )
-
-
-def formatted_airport_for_icao( icao ): 
-    return format_airport( airport_for_icao(icao) )
