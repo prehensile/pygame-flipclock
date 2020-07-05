@@ -24,10 +24,10 @@ def format_flight( flight, callsign=None  ):
     arr_airport = None
 
     if( flight.origin ):
-        dep_airport = airports.formatted_airport_for_icao( flight.origin.icao )
+        dep_airport = flight.origin.format()
     
     if( flight.destination ):
-        arr_airport = airports.formatted_airport_for_icao( flight.destination.icao )
+        arr_airport = flight.destination.format()
     
     return "{}: {} from {} to {}".format(
         datetime.datetime.now(),
@@ -176,14 +176,11 @@ class FlightWatcher( object ):
             try:
 
                 r = opensky.get_states( bbox=bbox )
-                # print( r )
                 #r = opensky.get_states()
             
                 if (r is not None) and r.states:
                     
                     for state in r.states: 
-
-                        # print( state )
 
                         timestamp = state.time_position
                         if timestamp is None:
@@ -204,8 +201,8 @@ class FlightWatcher( object ):
                                 if flight is not None:
                                     print( format_flight( flight, callsign ) )
                                     self.push_flight( flight )
-                                    last_seen_icao24 = icao24
                                     print( "successes: " + repr(self.success_counts) )
+                            last_seen_icao24 = icao24
 
                         break
                                 
@@ -329,5 +326,5 @@ def run_threaded():
 
 
 if __name__ == "__main__":
-#    run_blocking()
-   run_threaded()
+    run_blocking()
+   #run_threaded()
