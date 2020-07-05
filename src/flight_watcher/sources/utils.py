@@ -1,6 +1,7 @@
 import logging
 
 from model import Airport, Flight
+import airports
 
 
 def init_logging():
@@ -36,9 +37,9 @@ def parse_flight( source_object, origin_key, destination_key ):
     origin = None
     destination = None
     if len(origin_icao) > 1:
-        origin = Airport( origin_icao )
+        origin = airports.airport_for_icao( origin_icao )
     if len(destination_icao) > 1:
-        destination = Airport( destination_icao )
+        destination = airports.airport_for_icao( destination_icao )
 
     return Flight( origin, destination )
 
