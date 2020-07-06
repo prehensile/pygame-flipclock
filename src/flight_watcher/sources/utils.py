@@ -1,7 +1,7 @@
 import logging
 
-from model import Airport, Flight
-import airports
+from ..model import Airport, Flight
+from flight_watcher import airports
 
 
 def init_logging():
@@ -20,7 +20,21 @@ def retrieve_value( source_object, key ):
     return val
 
 
+def flight_for_icaos( origin_icao, destination_icao ):
+    origin = None
+    destination = None
+    if len(origin_icao) > 1:
+        origin = airports.airport_for_icao( origin_icao )
+    if len(destination_icao) > 1:
+        destination = airports.airport_for_icao( destination_icao )
+
+    return Flight( origin, destination )
+
+
 def parse_flight( source_object, origin_key, destination_key ):
+
+    logging.debug(  "parse_flight: %s", source_object )
+
     origin_icao = None
     destination_icao = None
 
@@ -34,14 +48,7 @@ def parse_flight( source_object, origin_key, destination_key ):
     except Exception as e:
         logging.exception( e )
     
-    origin = None
-    destination = None
-    if len(origin_icao) > 1:
-        origin = airports.airport_for_icao( origin_icao )
-    if len(destination_icao) > 1:
-        destination = airports.airport_for_icao( destination_icao )
-
-    return Flight( origin, destination )
+    return flight_for_icaos( origin_icao, destination_icao )
 
 
 def parse_flights( flights, origin_key, destination_key ):

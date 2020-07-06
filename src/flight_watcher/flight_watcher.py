@@ -23,6 +23,9 @@ def format_flight( flight, callsign=None  ):
     dep_airport = None
     arr_airport = None
 
+    print( flight.origin.name )
+    print( flight.destination.name )
+
     if( flight.origin ):
         dep_airport = flight.origin.format()
     
@@ -38,6 +41,8 @@ def format_flight( flight, callsign=None  ):
 
 
 flight_window = 60 * 60 * 24
+poll_interval = 30.0
+
 
 class FlightWatcher( object ):
 
@@ -69,10 +74,7 @@ class FlightWatcher( object ):
             route = r["route"]
             self.success_counts[ "opensky-routes" ] += 1
             return [
-                Flight( 
-                    Airport( route[0] ),
-                    Airport( route[-1] )
-                )
+                utils.flight_for_icaos( route[0], route[-1] )
             ]
         except Exception as e:
             print( "opensky.get_route failed: {}".format(
@@ -140,6 +142,16 @@ class FlightWatcher( object ):
         self.success_counts[ "failure" ] += 1
     
 
+    def on_callsign_received( self, icao24=None, callsign=None, timestamp=None ):
+        flights = self.get_flight_info( icao24=icao24, callsign=callsign, timestamp=timestamp )
+        if flights is not None:
+            flight = self.whittle_flights( flights )
+            print( flight )
+            if flight is not None:
+                print( format_flight( flight, callsign ) )
+                self.push_flight( flight )
+
+
     def pop_flights( self ):
         f = self.latest_flights
         self.latest_flights = []
@@ -164,6 +176,7 @@ class FlightWatcher( object ):
         
         last_seen_icao24 = None
         self.set_running( True )
+        last_poll_time = 0.0
 
         while self.is_running():
 
@@ -172,6 +185,10 @@ class FlightWatcher( object ):
             # https://opensky-network.org/api/states/all?lsamin=51.400140&lomin=-0.140049&lamax=51.448834&lomax=0.015570
             # r = opensky.get_states(bbox=(51.400140, 51.448834, -0.140049, 0.015570))
             # r = opensky.get_states()
+
+            t = time.time()
+            if (t - last_poll_time) < poll_interval:
+                continue
 
             try:
 
@@ -195,22 +212,15 @@ class FlightWatcher( object ):
                         ))
                         
                         if icao24 and (icao24 != last_seen_icao24):
-                            flights = self.get_flight_info( icao24=icao24, callsign=callsign, timestamp=timestamp )
-                            if flights is not None:
-                                flight = self.whittle_flights( flights )
-                                if flight is not None:
-                                    print( format_flight( flight, callsign ) )
-                                    self.push_flight( flight )
-                                    print( "successes: " + repr(self.success_counts) )
+                            self.on_callsign_received( icao24=icao24, callsign=callsign, timestamp=timestamp )
                             last_seen_icao24 = icao24
+                            print( "successes: " + repr(self.success_counts) )
 
-                        break
-                                
             
             except Exception as e:
                 logging.exception(e)
 
-            time.sleep( 30.0 )  
+            last_poll_time = time.time()  
 
 
 class FlightWatcherThreadedRunner( FlightWatcher ):
@@ -257,12 +267,17 @@ class FlightWatcherThreadedRunner( FlightWatcher ):
 
 class FlightWatcherThreaded( threading.Thread ):
     
+    @property
+    def runner( self ):
+        if not hasattr( self, "_runner" ):
+            self._runner = FlightWatcherThreadedRunner()
+        return self._runner
+
+
     def run( self ):
 
+        utils.init_logging()
         logging.debug( "FlightWatcherThreaded.run" )
-
-        if not hasattr( self, "runner" ):
-            self.runner = FlightWatcherThreadedRunner()
         
         bbox = None
         if hasattr( self, "bbox" ):
@@ -276,12 +291,20 @@ class FlightWatcherThreaded( threading.Thread ):
 
 
     def pop_flights( self ):
-        if hasattr( self, "runner" ):
-            return self.runner.pop_flights()
+        return self.runner.pop_flights()
     
 
     def stop( self ):
         self.runner.stop()
+    
+
+    # used for simulating an incoming callsign during testing
+    def on_callsign_received( self, icao24=None, callsign=None, timestamp=None ):
+        self.runner.on_callsign_received( icao24=icao24, callsign=callsign, timestamp=timestamp )
+
+
+    def init_logging( self ):
+        utils.init_logging()
 
 
 bbox = tuple( opensky.config["bbox"] )
@@ -304,7 +327,7 @@ def run_blocking():
 
 def run_threaded():
    
-    # utils.init_logging()
+    #utils.init_logging()
 
     watcher = FlightWatcherThreaded()
     watcher.set_bbox( bbox )
