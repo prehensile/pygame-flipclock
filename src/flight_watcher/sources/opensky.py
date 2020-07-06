@@ -1,14 +1,19 @@
 import json
+import os
 
 import requests
-from sources.opensky_api import OpenSkyApi, StateVector
+from flight_watcher.sources.opensky_api import OpenSkyApi, StateVector
 
-from model import Airport, Flight
-from sources import utils
+from ..model import Airport, Flight
+from ..sources import utils
 
 
 config = None
-with open( "data/opensky.json" ) as fp:
+pth_config = os.path.join(
+    os.path.dirname(__file__),
+    "../data/opensky.json"
+)
+with open( pth_config ) as fp:
     config = json.load( fp )
 
 

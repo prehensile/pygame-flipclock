@@ -1,15 +1,20 @@
 import json
 import sys
 import logging
+import os
 
 import requests
 
-from model import Airport, Flight
-from sources import utils
+from ..model import Airport, Flight
+from ..sources import utils
 
 
 config = None
-with open( "data/aviationstack.json" ) as fp:   
+pth_config = os.path.join(
+    os.path.dirname(__file__),
+    "../data/aviationstack.json"
+)
+with open( pth_config ) as fp:   
     config = json.load( fp )
 
 root_url = "http://api.aviationstack.com/v1/"

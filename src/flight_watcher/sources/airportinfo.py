@@ -6,8 +6,8 @@ import logging
 import cloudscraper
 import requests
 
-from model import Flight, Airport
-from sources import utils
+from ..model import Flight, Airport
+from ..sources import utils
 
 
 def parse_flight( o ):

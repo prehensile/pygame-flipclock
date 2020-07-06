@@ -1,7 +1,7 @@
 import requests
 
-from model import Flight, Airport
-from sources import utils
+from ..model import Airport, Flight
+from ..sources import utils
 
 
 def parse_flights( j ):

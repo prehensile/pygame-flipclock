@@ -1,14 +1,20 @@
 import json
 import logging
 import sys
+import os
 
 import requests
 
-from model import Airport, Flight
-from sources import utils
+from ..model import Airport, Flight
+from ..sources import utils
+
 
 config = None
-with open( 'data/flightaware.json' ) as fp:
+pth_config = os.path.join(
+    os.path.dirname(__file__),
+    "../data/flightaware.json"
+)
+with open( pth_config ) as fp:
     config = json.load( fp )
 
 fxml_root = "https://flightxml.flightaware.com/json/FlightXML2/"
