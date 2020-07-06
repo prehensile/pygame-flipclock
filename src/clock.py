@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import datetime
 import os
@@ -6,8 +7,10 @@ import random
 import re
 import sys
 import time
+import logging
 
 import pygame
+from flight_watcher import flight_watcher
 from pygame import display, draw
 
 
@@ -18,6 +21,9 @@ class DigitCache( object ):
 
     @classmethod
     def image_for_character( cls, c ):
+
+        logging.debug(  "image_for_character: %s", c )
+
         if c not in cls.images:
             
             pth_image = os.path.join(
@@ -27,11 +33,15 @@ class DigitCache( object ):
             
             if not os.path.exists(pth_image):
                 # fallback to hex representation of unicode point
+                fn_image = ord(c)
+                print( fn_image )
                 pth_image = os.path.join(
                 cls.image_path,
-                "{}.png".format( hex(ord(c)) )
+                "{}.png".format( fn_image )
             )
             
+            logging.debug( "load image: %s", pth_image )
+
             cls.images[c] = pygame.image.load(
                 pth_image
             )
@@ -112,7 +122,7 @@ class ClockDigit( object ):
 
 
 
-class NuDisplay( object ):
+class ClockDisplay( object ):
 
     def __init__( self, num_digits=4 ):
         self.digits = []
@@ -190,13 +200,52 @@ def update_display( window, surface, sr, d ):
         pygame.display.flip()
 
 
+class StateTracker( object ):
+
+    S_CLOCK = "clock"
+    S_IATA = "iata"
+
+    def __init__( self ):
+        self.state = None
+        self.state_began = 0
+    
+    def set_state( self, state ):
+        if state != self.state:
+            self.state_began = time.time()
+            self.state = state
+    
+    def get_state( self ):
+        return self.state
+    
+    def state_time( self ):
+        return time.time() - self.state_began
+
+
+london_iatas = [ "LHR", "LGW", "LTN", "STN", "SEN" ]
+def format_flight( f ):
+    # origins are more interesting than destinations
+    if f.origin.iata not in london_iatas:
+        return "{}↘".format( f.origin.iata )
+    elif f.destination.iata not in london_iatas:
+        return "↗{}".format( f.destination.iata )
+
+
 def main():
 
     ph = PygameHandler()
     window, surface = ph.initialize()
     sr = surface.get_rect()
-    d = NuDisplay()
     
+    d = ClockDisplay()
+    st = StateTracker()
+    
+    watcher = flight_watcher.FlightWatcherThreaded()
+    watcher.set_bbox( flight_watcher.bbox )
+    watcher.init_logging()
+    watcher.on_callsign_received( callsign="AJT929" )
+    # watcher.start()
+    
+    st.set_state( StateTracker.S_CLOCK )
     d.display_string("HLLO")
 
     update_display( window, surface, sr, d )
@@ -205,18 +254,42 @@ def main():
     q = False
     last_string = None
     fps = 12.0  
+   
     while not q:
-        dt = datetime.datetime.now()
-        ds = "{:02d}{:02d}".format( dt.second, dt.second )
+        
+        ds = last_string
+
+        flights = watcher.pop_flights()
+        if (flights is not None) and (len(flights)>0):
+            f = flights[-1]
+            logging.debug( "found flight: %r", f )
+            formatted = format_flight( f )
+            if formatted is not None:
+                print( formatted )
+                ds = formatted
+                st.set_state( StateTracker.S_IATA )
+        
+        if st.state == StateTracker.S_IATA:
+            logging.debug( "state time: %2.2f", st.state_time() )
+            if st.state_time() >= 5.0:
+                st.set_state( StateTracker.S_CLOCK )
+
+        if st.state == StateTracker.S_CLOCK:
+            dt = datetime.datetime.now()
+            ds = "{:02d}{:02d}".format( dt.hour, dt.minute )
+
         if ds != last_string:
             d.display_string( ds )
-            last_string = ds
+            last_string = ds        
         
         update_display( window, surface, sr, d )
         
         q = ph.was_quit()
         if not q:
             time.sleep( 1.0 / fps )
+    
+    watcher.stop()
+    watcher.join()
 
 
 if __name__ == '__main__':
