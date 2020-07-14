@@ -23,15 +23,12 @@ def format_flight( flight, callsign=None  ):
     dep_airport = None
     arr_airport = None
 
-    print( flight.origin.name )
-    print( flight.destination.name )
-
     if( flight.origin ):
         dep_airport = flight.origin.format()
     
     if( flight.destination ):
         arr_airport = flight.destination.format()
-    
+   
     return "{}: {} from {} to {}".format(
         datetime.datetime.now(),
         callsign.strip(),
