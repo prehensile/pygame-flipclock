@@ -228,9 +228,9 @@ london_iatas = [ "LHR", "LGW", "LTN", "STN", "SEN" ]
 def format_flight( f ):
     # origins are more interesting than destinations
     if (f.origin is not None) and (f.origin.iata not in london_iatas):
-        return "{}↘".format( f.origin.iata )
+        return u"{}↘".format( f.origin.iata )
     elif (f.destination is not None) and (f.destination.iata not in london_iatas):
-        return "↗{}".format( f.destination.iata )
+        return u"↗{}".format( f.destination.iata )
     
 
 def main():
