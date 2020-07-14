@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import datetime
+import logging
 import os
 import random
 import re
 import sys
 import time
-import logging
+
+from setuptools.command.upload import orig
 
 import pygame
 from flight_watcher import flight_watcher
@@ -22,7 +24,7 @@ class DigitCache( object ):
     @classmethod
     def image_for_character( cls, c ):
 
-        logging.debug(  "image_for_character: %s", c )
+        # logging.debug(  "image_for_character: %s", c )
 
         if c not in cls.images:
             
@@ -33,14 +35,14 @@ class DigitCache( object ):
             
             if not os.path.exists(pth_image):
                 # fallback to hex representation of unicode point
-                fn_image = ord(c)
-                print( fn_image )
+                fn_image = hex(ord(c))
+                # print( fn_image )
                 pth_image = os.path.join(
                 cls.image_path,
                 "{}.png".format( fn_image )
             )
             
-            logging.debug( "load image: %s", pth_image )
+            # logging.debug( "load image: %s", pth_image )
 
             cls.images[c] = pygame.image.load(
                 pth_image
@@ -72,6 +74,7 @@ class ClockDigit( object ):
 
 
     def set_character( self, c, delay=0 ):
+        # logging.debug( "set_character: %s", c )
         if c != self.current_character:
             self.set_image( DigitCache.image_for_character(c) )
             self.current_character = c
@@ -224,11 +227,11 @@ class StateTracker( object ):
 london_iatas = [ "LHR", "LGW", "LTN", "STN", "SEN" ]
 def format_flight( f ):
     # origins are more interesting than destinations
-    if f.origin.iata not in london_iatas:
+    if (f.origin is not None) and (f.origin.iata not in london_iatas):
         return "{}↘".format( f.origin.iata )
-    elif f.destination.iata not in london_iatas:
+    elif (f.destination is not None) and (f.destination.iata not in london_iatas):
         return "↗{}".format( f.destination.iata )
-
+    
 
 def main():
 
@@ -242,8 +245,8 @@ def main():
     watcher = flight_watcher.FlightWatcherThreaded()
     watcher.set_bbox( flight_watcher.bbox )
     watcher.init_logging()
-    watcher.on_callsign_received( callsign="AJT929" )
-    # watcher.start()
+    # watcher.on_callsign_received( callsign="AJT929" )
+    watcher.start()
     
     st.set_state( StateTracker.S_CLOCK )
     d.display_string("HLLO")
@@ -253,34 +256,40 @@ def main():
 
     q = False
     last_string = None
-    fps = 12.0  
+    fps = 18.0  
+    last_flight = None
    
     while not q:
         
-        ds = last_string
+        display_string = last_string
 
-        flights = watcher.pop_flights()
-        if (flights is not None) and (len(flights)>0):
-            f = flights[-1]
-            logging.debug( "found flight: %r", f )
-            formatted = format_flight( f )
-            if formatted is not None:
-                print( formatted )
-                ds = formatted
-                st.set_state( StateTracker.S_IATA )
+        # wrap flight poll and formatting in a try so it doesn't
+        # bring the whole clock down if something goes wrong
+        try:
+            flights = watcher.pop_flights()
+            if (flights is not None) and (len(flights)>0):
+                f = flights[-1]
+                logging.debug( "clock.py found flight: %r", f )
+                formatted = format_flight( f )
+                logging.debug( formatted )
+                if formatted is not None:
+                    display_string = formatted
+                    last_flight = formatted
+                    st.set_state( StateTracker.S_IATA )
+        except Exception as e:
+            logging.debug( e )
         
         if st.state == StateTracker.S_IATA:
-            logging.debug( "state time: %2.2f", st.state_time() )
             if st.state_time() >= 5.0:
                 st.set_state( StateTracker.S_CLOCK )
 
         if st.state == StateTracker.S_CLOCK:
             dt = datetime.datetime.now()
-            ds = "{:02d}{:02d}".format( dt.hour, dt.minute )
+            display_string = "{:02d}{:02d}".format( dt.hour, dt.minute )
 
-        if ds != last_string:
-            d.display_string( ds )
-            last_string = ds        
+        if display_string != last_string:
+            d.display_string( display_string )
+            last_string = display_string        
         
         update_display( window, surface, sr, d )
         
