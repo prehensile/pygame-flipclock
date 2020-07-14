@@ -2,7 +2,7 @@ var fs = require('fs');
 
 const { registerFont } = require('canvas')
 registerFont(
-    __dirname + "/AkzidenzGrotesk/AkzidenzGrotesk-Cond.otf",
+    __dirname + "fonts/AkzidenzGrotesk/AkzidenzGrotesk-Cond.otf",
     {
         family : "AkzidenzGrotesk-Cond"
     }
@@ -16,6 +16,11 @@ let glyphs = [];
 for (let c = 48; c < 58; c++) { glyphs.push( String.fromCharCode(c) ) };
 // generate uppercase A-Z from ascii char chodes
 for (let c = 65; c < 91; c++) { glyphs.push( String.fromCharCode(c) ) };
+
+const outPath = "./images"
+if( !fs.existsSync(outPath) ){
+    fs.mkdir( outPath );
+}
 
 for (const glyph of glyphs) {
     
