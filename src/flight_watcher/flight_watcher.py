@@ -218,6 +218,11 @@ class FlightWatcher( object ):
                 logging.exception(e)
 
             last_poll_time = time.time()  
+        
+        
+    def init_logging( self, log_level=logging.DEBUG, log_level_requests=logging.INFO ):
+        utils.init_logging( log_level=log_level, log_level_requests=log_level_requests )
+
 
 
 class FlightWatcherThreadedRunner( FlightWatcher ):
@@ -272,8 +277,7 @@ class FlightWatcherThreaded( threading.Thread ):
 
 
     def run( self ):
-
-        utils.init_logging()
+        
         logging.debug( "FlightWatcherThreaded.run" )
         
         bbox = None
@@ -300,8 +304,8 @@ class FlightWatcherThreaded( threading.Thread ):
         self.runner.on_callsign_received( icao24=icao24, callsign=callsign, timestamp=timestamp )
 
 
-    def init_logging( self ):
-        utils.init_logging()
+    def init_logging( self, log_level=logging.DEBUG, log_level_requests=logging.INFO ):
+        self.runner.init_logging( log_level=log_level, log_level_requests=log_level_requests )
 
 
 bbox = tuple( opensky.config["bbox"] )
@@ -309,23 +313,18 @@ bbox = tuple( opensky.config["bbox"] )
 def run_blocking():
     watcher = FlightWatcher()
 
-    # utils.init_logging()
-
-    print( "hello")
     if len(sys.argv) > 1:
         callsign = sys.argv[1]    
         flights = watcher.get_flight_info( callsign=callsign, icao24="4ca6c4" )
         flight = watcher.whittle_flights( flights )
-        print( flight )
-        print( format_flight( flight, callsign ) )
+        logging.debug( flight )
+        logging.debug( format_flight( flight, callsign ) )
     
     watcher.run( bbox=bbox )
 
 
 def run_threaded():
-   
-    #utils.init_logging()
-
+ 
     watcher = FlightWatcherThreaded()
     watcher.set_bbox( bbox )
     watcher.start()
@@ -334,7 +333,7 @@ def run_threaded():
         while True:
             flights = watcher.pop_flights()
             if (flights is not None) and (len(flights) > 0):
-                print( flights )
+                logging.debug( flights )
     except KeyboardInterrupt:
         print( "KeyboardInterrupt" )
         pass

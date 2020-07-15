@@ -4,11 +4,11 @@ from ..model import Airport, Flight
 from flight_watcher import airports
 
 
-def init_logging():
+def init_logging( log_level=logging.DEBUG, log_level_requests=logging.INFO ):
     logging.basicConfig()
-    logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel( log_level )
     requests_log = logging.getLogger("requests.packages.urllib3")
-    requests_log.setLevel(logging.DEBUG)
+    requests_log.setLevel( log_level_requests )
     requests_log.propagate = True
 
 
