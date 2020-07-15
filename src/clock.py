@@ -9,8 +9,6 @@ import re
 import sys
 import time
 
-from setuptools.command.upload import orig
-
 import pygame
 from flight_watcher import flight_watcher
 from pygame import display, draw
@@ -30,7 +28,7 @@ class DigitCache( object ):
             
             pth_image = os.path.join(
                 cls.image_path,
-                "{}.png".format( c )
+                u"{}.png".format( c )
             )
             
             if not os.path.exists(pth_image):
@@ -38,9 +36,9 @@ class DigitCache( object ):
                 fn_image = hex(ord(c))
                 # print( fn_image )
                 pth_image = os.path.join(
-                cls.image_path,
-                "{}.png".format( fn_image )
-            )
+                    cls.image_path,
+                    u"{}.png".format( fn_image )
+                )
             
             # logging.debug( "load image: %s", pth_image )
 
